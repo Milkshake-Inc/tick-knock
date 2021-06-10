@@ -1,21 +1,25 @@
-import {Class} from '../utils/Class';
+import { Class } from '../utils/Class';
+
+const componentIds = new Map<string, number>();
+let componentClassId = 1;
 
 /**
  * Gets an id for a component class.
  *
  * @param component Component class
- * @param createIfNotExists - If `true` then unique id for class component will be created,
- *  in case if it wasn't assigned earlier
+ * @param createIfNotExists If defined - will create unique id for class component, if it's not defined before
  */
-export function getComponentId<T>(
-  component: Class<T>,
-  createIfNotExists: boolean = false,
-): number | undefined {
-  if (component.hasOwnProperty(COMPONENT_CLASS_ID)) {
-    return (component as ComponentId<T>)[COMPONENT_CLASS_ID];
+export function getComponentId<T>(component: Class<T>, createIfNotExists = false): number | undefined {
+  if (component == undefined) return undefined;
+
+  const className = component.prototype ? component.prototype.constructor.name : component.constructor.name;
+  if (componentIds.has(className)) {
+    return componentIds.get(className);
   } else if (createIfNotExists) {
-    return (component as ComponentId<T>)[COMPONENT_CLASS_ID] = componentClassId++;
+    componentIds.set(className, componentClassId++);
+    return componentIds.get(className);
   }
+
   return undefined;
 }
 
@@ -32,11 +36,3 @@ export function getComponentClass<T extends K, K>(component: NonNullable<T>, res
   }
   return componentClass;
 }
-
-let COMPONENT_CLASS_ID = '__componentClassId__';
-let componentClassId: number = 1;
-
-type ComponentId<T> = Class<T> & {
-  [key: string]: number;
-};
-

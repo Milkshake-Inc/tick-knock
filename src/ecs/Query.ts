@@ -16,7 +16,13 @@ export type QueryPredicate = (entity: Entity) => boolean;
  * Query represents list of entities that matches query request.
  * @see QueryBuilder
  */
-export class Query {
+export class Query implements Iterable<Entity> {
+  *[Symbol.iterator](): Iterator<Entity> {
+    for (const entity of this.entities) {
+      yield entity;
+    }
+  }
+
   /**
    * Signal dispatches if new matched entity were added
    */
@@ -86,6 +92,25 @@ export class Query {
     return result;
   }
 
+  public firstBy(predicate: (entity: Entity) => boolean): Entity | undefined {
+    for (const entity of this._entities) {
+      if (predicate(entity)) return entity;
+    }
+    return undefined;
+  }
+
+  public includes(entity: Entity): boolean {
+    return this._entities.includes(entity);
+  }
+
+  public forEach(predicate: (value: Entity, index: number, array: Entity[]) => void): void {
+    this._entities.forEach(predicate);
+  }
+
+  public map<T>(predicate: (entity: Entity) => T): T[] {
+    return this._entities.map(predicate);
+  }
+
   /**
    * Returns the first entity from the query, that was accepted by predicate
    * @param {(entity: Entity) => boolean} predicate - function that will be called for every entity in the query until
@@ -122,7 +147,7 @@ export class Query {
    * Entities that will pass testing will become a part of the query
    */
   public matchEntities(entities: ReadonlyArray<Entity>) {
-    entities.forEach((entity) => this.entityAdded(entity));
+    entities.forEach(entity => this.entityAdded(entity));
   }
 
   /**
@@ -328,3 +353,29 @@ export function isQueryPredicate(item: unknown): item is QueryPredicate {
 export function isQueryBuilder(item: unknown): item is QueryBuilder {
   return item instanceof QueryBuilder;
 }
+
+export type QueryPattern = (entity: Entity) => boolean;
+
+export const all = (...componentClassOrTag: Array<Class<unknown> | Tag>): QueryPattern => {
+  return (entity: Entity) => {
+    return entity.hasAll(...componentClassOrTag);
+  };
+};
+
+export const any = (...componentClassOrTag: Array<Class<unknown> | Tag>): QueryPattern => {
+  return (entity: Entity) => {
+    return entity.hasAny(...componentClassOrTag);
+  };
+};
+
+export const not = (...componentClassOrTag: Array<Class<unknown> | Tag>): QueryPattern => {
+  return (entity: Entity) => {
+    return !entity.hasAny(...componentClassOrTag);
+  };
+};
+
+export const makeQuery = (...patterns: QueryPattern[]) => {
+  return new Query(entity => {
+    return patterns.every(p => p(entity));
+  });
+};

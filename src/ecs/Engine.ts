@@ -83,6 +83,11 @@ export class Engine {
     return this;
   }
 
+  public addEntities(...entity: Entity[]): Engine {
+    entity.forEach(entity => this.addEntity(entity));
+    return this;
+  }
+
   /**
    * Remove entity from engine
    * If engine not contains entity - it does nothing.
@@ -98,6 +103,11 @@ export class Engine {
     this.onEntityRemoved.emit(entity);
     this.disconnectEntity(entity);
 
+    return this;
+  }
+
+  public removeEntities(...entity: Entity[]): Engine {
+    entity.forEach(entity => this.removeEntity(entity));
     return this;
   }
 
@@ -184,9 +194,10 @@ export class Engine {
    *
    * @param dt Delta time in seconds
    */
-  public update(dt: number): void {
+  public update(dt: number, frameDelta: number): void {
     for (const system of this._systems) {
-      system.update(dt);
+      system.signalBeforeUpdate.emit(dt);
+      system.update(dt, frameDelta);
     }
   }
 
@@ -355,4 +366,41 @@ export class Engine {
   private onComponentRemoved = <T>(entity: Entity, component: NonNullable<T>, componentClass?: Class<NonNullable<T>>) => {
     this._queries.forEach(value => value.entityComponentRemoved(entity, component, componentClass));
   };
+
+  /**
+   * Updates the engine. Called multiple times per frame. Useful for determinisitic systems such as physics that need to run the same regardless of framerate.
+   *
+   * @param dt      Fixed Delta time in seconds
+   */
+  public updateFixed(dt: number): void {
+    for (const system of this._systems) {
+      system.updateFixed(dt);
+    }
+  }
+
+  /**
+   * Updates the engine. Called once per frame, after update. Useful for updating cameras before updateRender is called.
+   *
+   * @param dt Delta time in seconds
+   */
+  public updateLate(dt: number): void {
+    for (const system of this._systems) {
+      system.updateLate(dt);
+    }
+  }
+
+  /**
+   * Updates the engine. Called once per frame, after updateLate and update. This is the last thing called in the frame, making it useful for any rendering.
+   *
+   * @param dt Delta time in seconds
+   */
+  public updateRender(dt: number): void {
+    for (const system of this._systems) {
+      system.updateRender(dt);
+    }
+  }
+
+  public hasSystem<T extends System>(systemClass: Class<T>): boolean {
+    return this.getSystem(systemClass) != undefined;
+  }
 }

@@ -1,5 +1,5 @@
 import {getComponentClass, getComponentId} from './ComponentId';
-import {Class} from '../utils/Class';
+import {Class, isClass} from '../utils/Class';
 import {Signal} from '../utils/Signal';
 import {isTag, Tag} from './Tag';
 import {ILinkedComponent, isLinkedComponent} from './LinkedComponent';
@@ -260,6 +260,7 @@ export class Entity implements ReadonlyEntity {
   private _components: Record<number, unknown> = {};
   private _linkedComponents: Record<number, LinkedComponentList<ILinkedComponent>> = {};
   private _tags: Set<Tag> = new Set();
+  public static NumberComponents = 0;
 
   /**
    * Returns components map, where key is component identifier, and value is a component itself
@@ -275,6 +276,10 @@ export class Entity implements ReadonlyEntity {
    */
   public get tags(): ReadonlySet<Tag> {
     return this._tags;
+  }
+
+  public toString(): string {
+    return `Entity${this.id} [${Array.from(Object.values(this.components)).map((c: any) => c.constructor.name)}]`;
   }
 
   /**
@@ -312,11 +317,13 @@ export class Entity implements ReadonlyEntity {
    *  .add(EXPLOSIVE);
    * ```
    */
-  public add<T extends K, K extends unknown>(componentOrTag: NonNullable<T> | Tag, resolveClass?: Class<K>): Entity {
+  public add<T extends K, K extends unknown>(componentOrTag: Class<T> | NonNullable<T> | Tag, data: Partial<T> = {}, resolveClass?: Class<K>): Entity {
     if (isTag(componentOrTag)) {
       this.addTag(componentOrTag);
     } else {
-      this.addComponent(componentOrTag, resolveClass);
+      const component = isClass(componentOrTag) ? new componentOrTag() : componentOrTag;
+      Object.assign(component, data);
+      this.addComponent(component as NonNullable<T>, resolveClass);
     }
     return this;
   }
@@ -444,6 +451,7 @@ export class Entity implements ReadonlyEntity {
       this._components[id] = component;
       this.dispatchOnComponentAdded(component);
     }
+    Entity.NumberComponents++;
   }
 
   /**
@@ -452,7 +460,7 @@ export class Entity implements ReadonlyEntity {
    * - If linked component is not exists, then it will be added via `addComponent` method and {@link onComponentAdded}
    * will be triggered.
    * - If component already exists in the entity, then passed one will be appended to the tail. {@link
-    * onComponentAdded} wont be triggered.
+   * onComponentAdded} wont be triggered.
    *
    * @throws Throws error if component is null or undefined, or if component is not an instance of the class as well
    * @param {T | Tag} component ILinkedComponent instance
@@ -511,6 +519,7 @@ export class Entity implements ReadonlyEntity {
     if (!this._tags.has(tag)) {
       this._tags.add(tag);
       this.dispatchOnComponentAdded(tag);
+      Entity.NumberComponents++;
     }
   }
 
@@ -677,6 +686,8 @@ export class Entity implements ReadonlyEntity {
    * @see {@link pick}
    */
   public remove<T>(componentClassOrTag: Class<T> | Tag): T | undefined {
+    Entity.NumberComponents--;
+
     if (isTag(componentClassOrTag)) {
       this.removeTag(componentClassOrTag);
       return undefined;

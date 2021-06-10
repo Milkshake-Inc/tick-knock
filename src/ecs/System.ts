@@ -1,11 +1,16 @@
 import {Engine} from './Engine';
 import {Entity} from './Entity';
+import {Signal} from '../utils/Signal';
 
 /**
  * Systems are logic bricks in your application.
  * If you want to manipulate entities and their components - it is the right place for that.
  */
 export abstract class System {
+  public signalOnAddedToEngine: Signal<(engine: Engine) => void> = new Signal();
+  public signalOnRemovedFromEngine: Signal<(engine: Engine) => void> = new Signal();
+  public signalBeforeUpdate: Signal<(deltaTime: number) => void> = new Signal();
+
   private _priority: number = 0;
   private _engine?: Engine;
 
@@ -39,7 +44,28 @@ export abstract class System {
    * All logic aimed at making changes in entities and their components must be placed in this method.
    * @param dt - The time in seconds it took from previous update call.
    */
-  public update(dt: number) {}
+  public update(dt: number, frameDelta: number) {}
+
+  /**
+   * Called multiple times per frame. Useful for determinisitic systems such as physics that need to run the same regardless of framerate.
+   *
+   * @param dt      Fixed Delta time in seconds
+   */
+  public updateFixed(dt: number) {}
+
+  /**
+   * Called once per frame, after update. Useful for updating cameras before updateRender is called.
+   *
+   * @param dt Delta time in seconds
+   */
+  public updateLate(dt: number) {}
+
+  /**
+   * Called once per frame, after updateLate and update. This is the last thing called in the frame, making it useful for any rendering.
+   *
+   * @param dt Delta time in seconds
+   */
+  public updateRender(dt: number) {}
 
   /**
    * This method will be called after the system will be added to the Engine.
@@ -89,7 +115,7 @@ export abstract class System {
    */
   public dispatch<T>(message: T): void {
     if (this._engine === undefined) {
-      throw new Error('Dispatching a message can\'t be done while system is not attached to the engine');
+      throw new Error("Dispatching a message can't be done while system is not attached to the engine");
     }
     this.engine.dispatch(message);
   }
@@ -98,7 +124,15 @@ export abstract class System {
    * @internal
    */
   public setEngine(engine: Engine | undefined): void {
+    if (!engine) {
+      this.signalOnRemovedFromEngine.emit(this._engine as Engine);
+    }
+
     this._engine = engine;
+
+    if (engine) {
+      this.signalOnAddedToEngine.emit(this._engine as Engine);
+    }
   }
 
   /**
